@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- This block allows child templates to set their own unique page title -->
+    <title>{% block title %}Power Bidder{% endblock %}</title>
+    
+    <!-- Google Fonts for a clean, modern look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- Basic Reset and Body Styles --- */
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        /* --- Header Styles --- */
+        .main-header {
+            background-color: #ffffff;
+            color: #333;
+            padding: 15px 40px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-bottom: 3px solid #007BFF;
+        }
+
+        .main-header h1 {
+            margin: 0;
+            font-size: 2em;
+            font-weight: 700;
+        }
+
+        /* Make the header title a link back to the homepage */
+        .main-header a {
+            color: inherit; /* Inherit the color from the h1 tag */
+            text-decoration: none; /* Remove the underline */
+        }
+        .main-header a:hover {
+            color: #0056b3; /* Darken on hover */
+        }
+
+        /* --- Main Content Area --- */
+        .main-content {
+            padding: 20px;
+        }
+        
+    </style>
+
+    <!-- This block allows child templates to add their own specific CSS styles -->
+    {% block extra_head %}{% endblock %}
+
+</head>
+<body>
+
+    <header class="main-header">
+        <!-- This title links back to the main upload page -->
+        <h1><a href="{% url 'upload_csv' %}">Power Bidder Simulation</a></h1>
+    </header>
+
+    <main class="main-content">
+        <!-- This is where the content from results.html or upload.html will be inserted -->
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- You could add a footer here if you wanted -->
+    <!--
+    <footer class="main-footer">
+        <p>© 2024 Your Name or Company</p>
+    </footer>
+    -->
+
+</body>
+</html>

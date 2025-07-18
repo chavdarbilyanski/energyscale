@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Simulation Results{% endblock %}
+
+{% block extra_head %}
+<style>
+    .results-container { max-width: 1200px; margin: 20px auto; padding: 20px; }
+    .summary-card { background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 8px; padding: 25px; margin-bottom: 40px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 40px; align-items: center; margin-top: 15px; text-align: center; }
+    .score-container { grid-column: 1 / -1; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; }
+    .summary-grid strong { display: block; font-size: 1.1em; color: #555; margin-bottom: 5px; }
+    .profit-value { font-weight: bold; font-size: 2em; }
+    .profit-rl { color: #007BFF; }
+    .profit-perfect { color: #28a745; }
+    .score-value { font-size: 2.5em; font-weight: bold; color: #17a2b8; }
+    .results-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    .results-table th, .results-table td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+    .results-table th { background-color: #343a40; color: white; }
+    .results-table tr:nth-child(even) { background-color: #f2f2f2; }
+    .action-buy { color: #28a745; font-weight: bold; }
+    .action-sell { color: #dc3545; font-weight: bold; }
+    .action-hold { color: #6c757d; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="results-container">
+    <h1>Simulation Results</h1>
+
+    <div class="new-upload-container">
+        <a href="{% url 'upload_csv' %}" class="btn-primary">Upload New File & Run Again</a>
+    </div>
+
+    <!-- Summary Card at the Top -->
+    <div class="summary-card">
+        <h2>Performance Summary</h2>
+        <div class="summary-grid">
+            <div>
+                <strong>Your RL Model's Profit</strong>
+                <span class="profit-value profit-rl">€{{ rl_total_profit|floatformat:2 }}</span>
+            </div>
+            <div>
+                <strong>True Optimal Profit (Oracle)</strong>
+                <span class="profit-value profit-perfect">€{{ perfect_profit|floatformat:2 }}</span>
+            </div>
+            <div class="score-container">
+                <strong>Your Model Achieved</strong>
+                <span class="score-value">{{ performance_score|floatformat:2 }}%</span>
+                of the perfect score.
+            </div>
+        </div>
+    </div>
+
+    <h2>RL Model Hourly Action Log</h2>
+    <table class="results-table">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Hour</th>
+                <th>Price (€/kWh)</th>
+                <th>Action</th>
+                <th>Profit/Loss</th>
+                <th>Total Profit</th>
+                <th>Battery State (kWh)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in results %}
+            <tr>
+                <td>{{ row.timestamp }}</td>
+                <td>{{ row.hour }}</td>
+                <td>€{{ row.price|floatformat:4 }}</td>
+                <td class="action-{{ row.action|lower }}">{{ row.action }}</td>
+                <td>€{{ row.profit_change|floatformat:2 }}</td>
+                <td>€{{ row.total_profit|floatformat:2 }}</td>
+                <td>{{ row.battery_charge|floatformat:1 }} ({{ row.battery_percent|floatformat:1 }}%)</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

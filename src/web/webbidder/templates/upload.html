@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload CSV</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .form-container {
+            max-width: 600px;
+            margin: auto;
+        }
+        .form-container input, .form-container button {
+            margin: 10px 0;
+            padding: 8px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .form-container button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .form-container button:hover {
+            background-color: #0056b3;
+        }
+        .error {
+            color: red;
+            margin-bottom: 10px;
+        }
+        .form-field {
+            margin-bottom: 15px;
+        }
+        .form-field label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-field p {
+            margin: 5px 0 0;
+            font-size: 0.9em;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h1>Upload CSV File</h1>
+        {% if error %}
+            <p class="error">{{ error }}</p>
+        {% endif %}
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-field">
+                {{ form.csv_file.label_tag }}
+                {{ form.csv_file }}
+                {{ form.csv_file.errors }}
+                <p>{{ form.csv_file.help_text }}</p>
+            </div>
+            <div class="form-field">
+                {{ form.max_battery_capacity.label_tag }}
+                {{ form.max_battery_capacity }}
+                {{ form.max_battery_capacity.errors }}
+                <p>{{ form.max_battery_capacity.help_text }}</p>
+            </div>
+            <div class="form-field">
+                {{ form.charge_discharge_rate.label_tag }}
+                {{ form.charge_discharge_rate }}
+                {{ form.charge_discharge_rate.errors }}
+                <p>{{ form.charge_discharge_rate.help_text }}</p>
+            </div>
+            <button type="submit">Upload and Run</button>
+        </form>
+    </div>
+</body>
+</html>

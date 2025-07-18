@@ -1,0 +1,34 @@
+# This file automates your entire build and deploy process to Google Cloud.
+# To run: gcloud builds submit .
+
+steps:
+# Step 1: Build the container image using the Dockerfile from the 'docker' subdirectory.
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'europe-central2-docker.pkg.dev/$PROJECT_ID/dockerrepochavdar/webapp:latest', '-f', 'docker/Dockerfile', '.']
+
+# Step 2: Push the built image to Google Artifact Registry.
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'europe-central2-docker.pkg.dev/$PROJECT_ID/dockerrepochavdar/webapp:latest']
+
+# Step 3: Deploy the new image to Cloud Run with all production configurations.
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: 'gcloud'
+  args:
+    - 'run'
+    - 'deploy'
+    - 'webbidder' # Your Cloud Run service name
+    - '--image=europe-central2-docker.pkg.dev/$PROJECT_ID/dockerrepochavdar/webapp:latest'
+    - '--region=europe-central2'
+    - '--platform=managed'
+    - '--allow-unauthenticated'
+    - '--port=8000' # The port your Gunicorn server listens on
+    - '--memory=1Gi'
+    - '--timeout=600'
+    # Set the environment variables for your PRODUCTION environment.
+    - '--set-env-vars=DEBUG=False,ALLOWED_HOSTS=webbidder-380536777459.europe-central2.run.app,CSRF_TRUSTED_ORIGINS=https://webbidder-380536777459.europe-central2.run.app'
+    # Securely inject your SECRET_KEY from Google Secret Manager.
+    - '--update-secrets=SECRET_KEY=DJANGO_SECRET_KEY:latest'
+
+# Tag the image as 'latest' after a successful build.
+images:
+- 'europe-central2-docker.pkg.dev/$PROJECT_ID/dockerrepochavdar/webapp:latest'

@@ -1,0 +1,49 @@
+name: CI/CD Pipeline
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run tests
+        run: pytest tests/
+      - name: Lint
+        run: flake8 src/
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - name: Configure Docker for GCP
+        run: gcloud auth configure-docker
+      - name: Build and push Django Docker image
+        run: |
+          docker build -t gcr.io/myproject/django:latest -f docker/Dockerfile .
+          docker push gcr.io/myproject/django:latest
+      # Optional: Uncomment if using Dockerfile.ml for ML
+      # - name: Build and push ML Docker image
+      #   run: |
+      #     docker build -t gcr.io/myproject/ml:latest -f docker/Dockerfile.ml .
+      #     docker push gcr.io/myproject/ml:latest
+      - name: Deploy to GCP Cloud Run
+        run: gcloud run deploy myproject --image gcr.io/myproject/django:latest --region us-central1 --allow-unauthenticated
