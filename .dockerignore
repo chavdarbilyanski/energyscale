@@ -1,0 +1,11 @@
+# Ignore everything first
+**
+
+# Then, un-ignore the files and folders we actually need for the build
+!/src/
+!/tests/
+!/requirements/
+!/requirements/requirements.txt
+!/requirements/requirements-ml.txt
+!/docker/
+!/docker/Dockerfile

@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+
+# Environments
+.env
+.venv
+venv/
+env/
+ENV/
+*.env.*
+!.env.example
+
+# Django
+*.log
+*.pot
+db.sqlite3
+/media/
+/staticfiles/
+local_settings.py
+
+# VS Code
+.vscode/
+
+# Other
+.DS_Store
