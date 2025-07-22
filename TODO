@@ -1,1 +1,26 @@
 Switch from gym to gymnasium - done
+
+GLOBAL_OPTIMAL:
+
+from pulp import LpMaximize, LpProblem, LpVariable, lpSum
+
+# In calculate_globally_optimal_profit
+prob = LpProblem("BESS_Arbitrage", LpMaximize)
+prices = df['price'].tolist()
+T = len(prices)
+charge = [LpVariable(f"charge_{t}", 0, charge_discharge_rate) for t in range(T)]
+discharge = [LpVariable(f"discharge_{t}", 0, charge_discharge_rate) for t in range(T)]
+soc = [LpVariable(f"soc_{t}", 0, max_battery_capacity) for t in range(T)]  # State of charge
+
+prob += lpSum([prices[t] * (discharge[t] - charge[t]) / 1000 for t in range(T)])  # Objective: profit in EUR/kWh
+
+# Constraints
+for t in range(T):
+    if t == 0:
+        prob += soc[0] == charge[0] - discharge[0]
+    else:
+        prob += soc[t] == soc[t-1] + charge[t] - discharge[t]
+prob.solve()
+return value(prob.objective)
+
+

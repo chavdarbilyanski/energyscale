@@ -5,11 +5,15 @@ import logging
 from io import StringIO
 import pandas as pd
 import numpy as np
-import gym
-from gym import spaces
+import gymnasium as gym
+from gymnasium import spaces
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from django.conf import settings
+import mlflow
+from mlflow.tracking import MlflowClient
+from tenacity import retry, stop_after_attempt, wait_exponential
+import tempfile
 
 logger = logging.getLogger(__name__)
 
@@ -24,18 +28,28 @@ class BatteryEnv(gym.Env):
     def step(self, action): return self.observation_space.sample(), 0, False, {}
     def reset(self): return self.observation_space.sample()
 
-def load_rl_model_and_env():
-    logger.info("Loading RL model and environment stats...")
-    model_path = os.path.join(settings.BASE_DIR, 'powerbidder', "battery_ppo_agent_v2.zip")
-    stats_path = os.path.join(settings.BASE_DIR, 'powerbidder', "vec_normalize_stats_v2.pkl")
+_model = None
+_vec_env = None
 
-    if not os.path.exists(model_path) or not os.path.exists(stats_path):
-        raise FileNotFoundError("RL Model or stats file not found.")
+def load_rl_model_and_env():
+    global _model, _vec_env
+    if _model is not None and _vec_env is not None:
+        logger.info("Using cached RL model and env.")
+        return _model, _vec_env
     
-    vec_env = DummyVecEnv([lambda: BatteryEnv()])
-    vec_env = VecNormalize.load(stats_path, vec_env)
-    model = PPO.load(model_path, env=vec_env)
-    return model, vec_env
+    logger.info("Loading RL model from MLflow...")
+    # Fix: Add 'http://' prefix; use env var for local/GCP flexibility
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://host.docker.internal:5000")
+    mlflow.set_tracking_uri(tracking_uri)
+    
+    # Direct load (no MlflowClient/search—simplified as requested)
+    model_uri = "models:/BatteryPPOModel/1"  # Use your latest version; or /Production
+    wrapper = mlflow.pyfunc.load_model(model_uri)
+    
+    _model = wrapper._model_impl.python_model.model  # From PPOModelWrapper
+    _vec_env = wrapper._model_impl.python_model.env
+    
+    return _model, _vec_env
 
 # --- Main Service Function for RL Model Simulation ---
 def run_rl_model_simulation(csv_file, max_battery_capacity, charge_discharge_rate):

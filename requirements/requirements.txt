@@ -5,3 +5,5 @@ python-dotenv==1.0.0
 django-environ
 gunicorn
 whitenoise
+tenacity==8.5.0
+psycopg2==2.9.9

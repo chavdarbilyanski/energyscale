@@ -3,7 +3,7 @@
 # --- Stage 1: The Builder ---
 # This stage installs all dependencies, including build-time tools.
 # Using a specific version tag is a best practice.
-FROM python:3.10-slim-bullseye AS builder
+FROM python:3.12-slim-bullseye AS builder
 
 # Set environment variables for Python to run optimally
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -16,8 +16,8 @@ RUN python3 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Install system dependencies that might be needed for Python packages.
-# 'build-essential' is for compiling C extensions.
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
+# 'build-essential' is for compiling C extensions, 'libpq-dev' for psycopg2, 'postgresql-client' for pg_config, 'swig' for box2d-py.
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential libpq-dev postgresql-client swig && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory for the build
 WORKDIR /app
@@ -27,14 +27,16 @@ COPY requirements/requirements.txt .
 COPY requirements/requirements-ml.txt .
 
 # Install the dependencies into the virtual environment
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir -r requirements-ml.txt
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt && pip install --no-cache-dir -r requirements-ml.txt
 
 
 # --- Stage 2: The Final Production Image ---
 # This stage starts from a clean base image and copies only what's necessary,
 # resulting in a smaller and more secure final image.
-FROM python:3.10-slim-bullseye AS final
+FROM python:3.12-slim-bullseye AS final
+
+# Install runtime dependencies for psycopg2 (libpq5 is needed at runtime).
+RUN apt-get update && apt-get install -y --no-install-recommends libpq5 && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user and group for security
 RUN groupadd -r django && useradd -r -g django django
@@ -69,4 +71,4 @@ EXPOSE 8000
 # Run the application with Gunicorn
 # We call the gunicorn executable directly from our virtual environment's bin directory.
 # This ensures it uses the correct Python interpreter and can find all installed packages.
-CMD ["/opt/venv/bin/gunicorn", "--bind", "0.0.0.0:8000", "powerbidder.wsgi:application"]
+CMD ["/opt/venv/bin/gunicorn", "--bind", "0.0.0.0:8000", "--timeout", "120", "powerbidder.wsgi:application"]

@@ -32,6 +32,12 @@ ALLOWED_HOSTS = env('ALLOWED_HOSTS', default='127.0.0.1,localhost').split(',')
 # This version filters out any empty strings that result from splitting an empty default.
 CSRF_TRUSTED_ORIGINS = [origin for origin in env('CSRF_TRUSTED_ORIGINS', default='').split(',') if origin]
 
+#MLFlow settings
+MLFLOW_TRACKING_URI = os.environ.get('MLFLOW_TRACKING_URI', 'http://host.docker.internal:5000')  # Or GCP URI
+MLFLOW_MODEL_RUN_ID = os.environ.get('MLFLOW_MODEL_RUN_ID')  # Set this in .env or GCP env vars
+MLFLOW_MODEL_NAME = os.environ.get('MLFLOW_MODEL_NAME', 'BatteryPPOModel')  # For registry
+MLFLOW_MODEL_VERSION = os.environ.get('MLFLOW_MODEL_VERSION', '1')  # Default to version 1
+
 
 # --- Application definition ---
 INSTALLED_APPS = [
