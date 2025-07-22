@@ -9,7 +9,6 @@ import gymnasium as gym
 from gymnasium import spaces
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
-from django.conf import settings
 import mlflow
 from mlflow.tracking import MlflowClient
 from tenacity import retry, stop_after_attempt, wait_exponential

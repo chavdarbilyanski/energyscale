@@ -37,9 +37,9 @@ class PPOModelWrapper(mlflow.pyfunc.PythonModel):
 
 # --- 1. Configuration ---
 DATA_FILE_NAME = '/Users/chavdarbilyanski/powerbidder/src/ml/data/combine/combined_output_with_features.csv'
-RL_MODEL_PATH = "battery_ppo_agent_v3.zip"
-STATS_PATH = "vec_normalize_stats_v3.pkl"
-TOTAL_TIMESTEPS_MULTIPLIER = 4
+RL_MODEL_PATH = "battery_ppo_agent_v4 .zip"
+STATS_PATH = "vec_normalize_stats_v4.pkl"
+TOTAL_TIMESTEPS_MULTIPLIER = 800
 
 # Column names
 DATE_COLUMN = 'Date'

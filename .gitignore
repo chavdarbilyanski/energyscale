@@ -29,7 +29,6 @@ local_settings.py
 mlruns/
 mlartifacts/
 outputs/
-mlruns.db
 **/basic_auth.db
 
 # Mac
@@ -50,3 +49,4 @@ ppo_battery_tensorboard/PPO_11/events.out.tfevents.1753190224.Chavdars-MacBook-P
 ppo_battery_tensorboard/PPO_12/events.out.tfevents.1753190264.Chavdars-MacBook-Pro.local.70622.0
 ppo_battery_tensorboard/PPO_13/events.out.tfevents.1753190362.Chavdars-MacBook-Pro.local.71293.0
 ppo_battery_tensorboard/PPO_9/events.out.tfevents.1753187979.Chavdars-MacBook-Pro.local.28378.0
+ppo_battery_tensorboard/PPO_14/events.out.tfevents.1753192516.Chavdars-MacBook-Pro.local.45650.0
