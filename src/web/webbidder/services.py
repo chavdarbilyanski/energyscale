@@ -11,8 +11,6 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 import mlflow
 from mlflow.tracking import MlflowClient
-from tenacity import retry, stop_after_attempt, wait_exponential
-import tempfile
 
 logger = logging.getLogger(__name__)
 
@@ -33,19 +31,25 @@ _vec_env = None
 def load_rl_model_and_env():
     global _model, _vec_env
     if _model is not None and _vec_env is not None:
-        logger.info("Using cached RL model and env.")
         return _model, _vec_env
     
-    logger.info("Loading RL model from MLflow...")
-    # Fix: Add 'http://' prefix; use env var for local/GCP flexibility
+    logger.info("Loading RL model from MLflow by tag...")
     tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://host.docker.internal:5000")
     mlflow.set_tracking_uri(tracking_uri)
     
-    # Direct load (no MlflowClient/search—simplified as requested)
-    model_uri = "models:/BatteryPPOModel/1"  # Use your latest version; or /Production
-    wrapper = mlflow.pyfunc.load_model(model_uri)
+    client = MlflowClient()
+    # Search for version with tag 'stage: Production'
+    filter_string = "name='BatteryPPOModel' AND tag.stage = 'Production'"
+    versions = client.search_model_versions(filter_string)
+    if not versions:
+        raise ValueError("No Production-tagged model found.")
     
-    _model = wrapper._model_impl.python_model.model  # From PPOModelWrapper
+    # Pick the latest (or sort by creation_time if multiple)
+    latest_prod_version = sorted(versions, key=lambda v: v.creation_timestamp, reverse=True)[0]
+    model_uri = f"models:/BatteryPPOModel/{latest_prod_version.version}"
+    
+    wrapper = mlflow.pyfunc.load_model(model_uri)
+    _model = wrapper._model_impl.python_model.model
     _vec_env = wrapper._model_impl.python_model.env
     
     return _model, _vec_env
