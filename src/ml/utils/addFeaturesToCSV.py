@@ -3,8 +3,8 @@ from datetime import datetime
 import io
 
 # --- Configuration ---
-INPUT_FILENAME = '/Users/chavdarbilyanski/powerbidder/src/ml/data/combine/JanFeb2025.csv'
-OUTPUT_FILENAME = '/Users/chavdarbilyanski/powerbidder/src/ml/data/combine/JanFeb2025_output_with_features.csv'
+INPUT_FILENAME = '/Users/chavdarbilyanski/energyscale/src/ml/data/combine/combined_output.csv'
+OUTPUT_FILENAME = '/Users/chavdarbilyanski/energyscale/src/ml/data/combine/combined_output_with_features.csv'
 # ---------------------
 
 
@@ -31,7 +31,7 @@ try:
 
             try:
                 # 3. Parse the date string (assuming d/m/YY format)
-                date_obj = datetime.strptime(date_str, '%d/%m/%Y')
+                date_obj = datetime.strptime(date_str, '%m/%d/%y')
                 
                 # 4. Get the day of the week (Monday=0, Sunday=6) and month
                 day_of_week = date_obj.weekday()

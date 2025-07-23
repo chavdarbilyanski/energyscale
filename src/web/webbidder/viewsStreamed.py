@@ -78,7 +78,7 @@ def upload_csv(request):
 
         # Create a chunk iterator from the uploaded file
         # The 'utf-8' encoding is often needed for files from different systems
-        chunk_iterator = pd.read_csv(csv_file, sep=';', decimal='.', chunksize=chunk_size, encoding='utf-8')
+        chunk_iterator = pd.read_csv(csv_file, sep=';', decimal=',', chunksize=chunk_size, encoding='utf-8')
 
         for chunk in chunk_iterator:
             logger.info(f"Processing chunk of {len(chunk)} rows...")

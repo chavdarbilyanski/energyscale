@@ -57,7 +57,7 @@ class BatteryEnv(gym.Env):
 # --- SCRIPT LOGIC ---
 
 # 1. Load your data (needed to initialize the env)
-dataset = pd.read_csv(DATA_FILE_NAME, sep=';', decimal='.')
+dataset = pd.read_csv(DATA_FILE_NAME, sep=';', decimal=',')
 # (Add any other preprocessing you did before training)
 dataset.rename(columns={'Price (EUR)': PRICE_COLUMN, 'Hour': HOUR_COLUMN, 'DayOfWeek': DAY_OF_WEEK_COLUMN, 'Month': MONTH_COLUMN}, inplace=True)
 dataset[PRICE_COLUMN] = pd.to_numeric(dataset[PRICE_COLUMN], errors='coerce')

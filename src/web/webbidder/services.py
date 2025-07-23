@@ -64,7 +64,7 @@ def run_rl_model_simulation(csv_file, max_battery_capacity, charge_discharge_rat
     all_results = []
     
     csv_data = csv_file.read().decode('utf-8')
-    df = pd.read_csv(StringIO(csv_data), sep=';', decimal='.')
+    df = pd.read_csv(StringIO(csv_data), sep=';', decimal=',')
     
     # Preprocessing logic from your original view
     df.rename(columns={'Price (EUR)': 'price', 'Date': 'timestamp', 'Hour': 'hour'}, inplace=True)
@@ -132,7 +132,7 @@ def calculate_globally_optimal_profit(csv_file, max_battery_capacity, charge_dis
     
     csv_file.seek(0) # Ensure we read the file from the beginning
     csv_data = csv_file.read().decode('utf-8')
-    df = pd.read_csv(StringIO(csv_data), sep=';', decimal='.')
+    df = pd.read_csv(StringIO(csv_data), sep=';', decimal=',')
     
     df.rename(columns={'Price (EUR)': 'price', 'Date': 'timestamp', 'Hour': 'hour'}, inplace=True)
     df['price'] = pd.to_numeric(df['price'], errors='coerce')

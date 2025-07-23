@@ -49,7 +49,7 @@ PRICE_COLUMN = 'Price (EUR)'
 # --- 2. Data Loading and Preparation ---
 print("Loading and preparing historical data...")
 # Load data into a DataFrame named 'dataset'
-dataset = pd.read_csv(DATA_FILE_NAME, sep=';', decimal='.') # Corrected decimal separator to comma
+dataset = pd.read_csv(DATA_FILE_NAME, sep=';', decimal=',') 
 dataset.rename(columns={'Price (EUR)': PRICE_COLUMN, 'Date': DATE_COLUMN}, inplace=True)
 # Add any other data cleaning or feature engineering here...
 dataset[PRICE_COLUMN] = pd.to_numeric(dataset[PRICE_COLUMN], errors='coerce')
@@ -110,9 +110,6 @@ with mlflow.start_run(run_name="BatteryPPO_Training_v2") as run:  # Start an MLf
     model.learn(total_timesteps=total_timesteps, progress_bar=True)
     print("--- Training complete ---")
     print("Saving and logging model artifacts to MLflow...")
-
-    model.save(RL_MODEL_PATH)
-    env.save(STATS_PATH)
 
     # Log as a pyfunc model with artifacts
     mlflow.pyfunc.log_model(

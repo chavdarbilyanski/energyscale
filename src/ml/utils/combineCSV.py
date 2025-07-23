@@ -37,7 +37,7 @@ def combine_csv_files(input_path, output_file):
         combined_df = pd.concat(df_list, ignore_index=True)
         
         # Save the combined DataFrame to a new CSV file
-        combined_df.to_csv(output_file, sep=';', index=False)
+        combined_df.to_csv(output_file, sep=';', index=False, header=None)
         print(f"\nSuccessfully combined {len(all_files)} CSV files into {output_file}")
         print(f"Total rows in combined file: {len(combined_df)}")
         
@@ -47,7 +47,7 @@ def combine_csv_files(input_path, output_file):
 # Example usage
 if __name__ == "__main__":
     # Specify your input directory and output file path
-    input_directory = "/Users/chavdarbilyanski/powerbidder/combine"  # Replace with your directory path
-    output_file = "/Users/chavdarbilyanski/powerbidder/combine/combined_output.csv"  # Replace with your output file path
+    input_directory =   "/Users/chavdarbilyanski/energyscale/src/ml/data/input"  # Replace with your directory path
+    output_file =       "/Users/chavdarbilyanski/energyscale/src/ml/data/output/combined_output.csv"  # Replace with your output file path
     
     combine_csv_files(input_directory, output_file)
