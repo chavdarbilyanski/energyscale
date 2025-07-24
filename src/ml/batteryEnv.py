@@ -12,47 +12,35 @@ PRICE_AVG24_COLUMN = 'price_rolling_avg_24h'
 
 
 class BatteryEnv(gym.Env):
-    """Custom Environment for a Battery Storage agent."""
-    metadata = {'render_modes': ['human']}
-
     def __init__(self, historical_data, storage_capacity, charge_rate, efficiency):
         super(BatteryEnv, self).__init__()
-
         self.data = historical_data.reset_index(drop=True)
         self.storage_capacity = storage_capacity
         self.charge_rate = charge_rate
         self.efficiency = efficiency
 
-        # ACTION SPACE: 0=HOLD, 1=BUY, 2=SELL
+        # Action space: 0=HOLD, 1=CHARGE, 2=DISCHARGE
         self.action_space = spaces.Discrete(3)
 
-        # OBSERVATION SPACE (State)
-        # We define the lower and upper bounds for each feature
-        # [Price, Hour, Day, Month, Avg_Price, Battery_%]
-        low_bounds = np.array(
-            [0, 0, 0, 1, 0, 0], dtype=np.float32
-        )
-        high_bounds = np.array(
-            [np.inf, 23, 6, 12, np.inf, 1.0], dtype=np.float32
-        )
+        # Observation space: [Price, Hour_Sin, Hour_Cos, DayOfWeek_Sin, DayOfWeek_Cos, Month_Sin, Month_Cos, Avg_Price, Battery_%]
+        low_bounds = np.array([0, -1, -1, -1, -1, -1, -1, 0, 0], dtype=np.float32)
+        high_bounds = np.array([np.inf, 1, 1, 1, 1, 1, 1, np.inf, 1.0], dtype=np.float32)
         self.observation_space = spaces.Box(low=low_bounds, high=high_bounds, dtype=np.float32)
 
-        # Initialize state
         self.current_step = 0
         self.current_kwh = self.storage_capacity / 2
         self.total_profit = 0
 
     def _get_observation(self):
-        """Constructs the observation from the current state."""
         row = self.data.iloc[self.current_step]
         battery_percent = self.current_kwh / self.storage_capacity
 
         state = np.array([
-            row[PRICE_COLUMN],
-            row[HOUR_COLUMN],
-            row[DAY_OF_WEEK_COLUMN],
-            row[MONTH_COLUMN],
-            row[PRICE_AVG24_COLUMN],
+            row['Price (EUR)'],
+            row['hour_sin'], row['hour_cos'],
+            row['dayofweek_sin'], row['dayofweek_cos'],
+            row['month_sin'], row['month_cos'],
+            row['price_rolling_avg_24h'],
             battery_percent
         ], dtype=np.float32)
         return state

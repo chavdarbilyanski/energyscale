@@ -37,10 +37,18 @@ class BatteryEnv(gym.Env):
     def step(self, action): return self.observation_space.sample(), 0, False, False, {}
     def reset(self, seed=None): return self.observation_space.sample(), {}
 
+def compute_cyclic_features(hour, dayofweek, month):
+    hour_sin = np.sin(2 * np.pi * hour / 24)
+    hour_cos = np.cos(2 * np.pi * hour / 24)
+    dayofweek_sin = np.sin(2 * np.pi * dayofweek / 7)
+    dayofweek_cos = np.cos(2 * np.pi * dayofweek / 7)
+    month_sin = np.sin(2 * np.pi * month / 12)
+    month_cos = np.cos(2 * np.pi * month / 12)
+    return hour_sin, hour_cos, dayofweek_sin, dayofweek_cos, month_sin, month_cos
 
 # --- MAIN BACKTESTING LOGIC ---
 if __name__ == "__main__":
-    # 1. Load and Prepare Historical Data
+    # 1. Load and Prepare Historical Data (unchanged, but note: no need for sin/cos in df)
     print("Loading historical data...")
     df = pd.read_csv(HISTORICAL_DATA_FILE, sep=';', decimal=',')
     df.rename(columns={'Price (EUR)': PRICE_COLUMN, 'Hour': HOUR_COLUMN, 
@@ -77,14 +85,22 @@ if __name__ == "__main__":
     # 4. Run the Backtest Loop
     print(f"Running simulation over {len(df)} time steps...")
     for index, row in df.iterrows():
-        # A. Construct the current observation
+        # A. Construct the current observation with on-the-fly sin/cos
         current_storage_percent = current_kwh / STORAGE_CAPACITY_KWH
+        
+        # Compute cyclic features from raw row values
+        hour_sin, hour_cos, dayofweek_sin, dayofweek_cos, month_sin, month_cos = compute_cyclic_features(
+            row[HOUR_COLUMN], row[DAY_OF_WEEK_COLUMN], row[MONTH_COLUMN]
+        )
         
         obs_raw = np.array([
             row[PRICE_COLUMN],
-            row[HOUR_COLUMN],
-            row[DAY_OF_WEEK_COLUMN],
-            row[MONTH_COLUMN],
+            hour_sin,
+            hour_cos,
+            dayofweek_sin,
+            dayofweek_cos,
+            month_sin,
+            month_cos,
             row[PRICE_AVG24_COLUMN],
             current_storage_percent
         ], dtype=np.float32)

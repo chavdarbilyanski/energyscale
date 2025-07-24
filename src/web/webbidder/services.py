@@ -5,33 +5,18 @@ import logging
 from io import StringIO
 import pandas as pd
 import numpy as np
-import gymnasium as gym
-from gymnasium import spaces
-from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 import mlflow
 from mlflow.tracking import MlflowClient
 
 logger = logging.getLogger(__name__)
 
-# --- Helper Classes and Functions for RL Model ---
-class BatteryEnv(gym.Env):
-    def __init__(self):
-        super(BatteryEnv, self).__init__()
-        self.action_space = spaces.Discrete(3)
-        low_bounds = np.array([0, 0, 0, 1, 0, 0], dtype=np.float32)
-        high_bounds = np.array([np.inf, 23, 6, 12, np.inf, 1.0], dtype=np.float32)
-        self.observation_space = spaces.Box(low=low_bounds, high=high_bounds, dtype=np.float32)
-    def step(self, action): return self.observation_space.sample(), 0, False, {}
-    def reset(self): return self.observation_space.sample()
-
-_model = None
-_vec_env = None
+# Global caching for the loaded pyfunc model (avoids reloading on every request)
+_model_wrapper = None
 
 def load_rl_model_and_env():
-    global _model, _vec_env
-    if _model is not None and _vec_env is not None:
-        return _model, _vec_env
+    global _model_wrapper
+    if _model_wrapper is not None:
+        return _model_wrapper
     
     logger.info("Loading RL model from MLflow by tag...")
     tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://host.docker.internal:5000")
@@ -48,16 +33,13 @@ def load_rl_model_and_env():
     latest_prod_version = sorted(versions, key=lambda v: v.creation_timestamp, reverse=True)[0]
     model_uri = f"models:/BatteryPPOModel/{latest_prod_version.version}"
     
-    wrapper = mlflow.pyfunc.load_model(model_uri)
-    _model = wrapper._model_impl.python_model.model
-    _vec_env = wrapper._model_impl.python_model.env
-    
-    return _model, _vec_env
+    _model_wrapper = mlflow.pyfunc.load_model(model_uri)
+    return _model_wrapper
 
 # --- Main Service Function for RL Model Simulation ---
 def run_rl_model_simulation(csv_file, max_battery_capacity, charge_discharge_rate):
-    """This function contains your existing, working RL model simulation logic."""
-    model, vec_env = load_rl_model_and_env()
+    """Run RL model simulation for BESS profit maximization."""
+    model_wrapper = load_rl_model_and_env()  # Load the pyfunc wrapper (handles PPO and VecNormalize)
     
     battery_charge = 0.0
     total_profit = 0.0
@@ -66,13 +48,14 @@ def run_rl_model_simulation(csv_file, max_battery_capacity, charge_discharge_rat
     csv_data = csv_file.read().decode('utf-8')
     df = pd.read_csv(StringIO(csv_data), sep=';', decimal=',')
     
-    # Preprocessing logic from your original view
+    # Preprocessing logic
     df.rename(columns={'Price (EUR)': 'price', 'Date': 'timestamp', 'Hour': 'hour'}, inplace=True)
     df['price'] = pd.to_numeric(df['price'], errors='coerce')
     df['timestamp'] = pd.to_datetime(df['timestamp'], format='%d/%m/%Y', errors='coerce')
     df['hour'] = pd.to_numeric(df['hour'], errors='coerce')
     df.dropna(inplace=True)
-    if df.empty: raise ValueError("CSV is empty after cleaning.")
+    if df.empty:
+        raise ValueError("CSV is empty after cleaning.")
 
     df['DayOfWeek'] = df['timestamp'].dt.weekday
     df['Month'] = df['timestamp'].dt.month
@@ -84,14 +67,28 @@ def run_rl_model_simulation(csv_file, max_battery_capacity, charge_discharge_rat
         price_mwh = row['price']
         price_kwh = price_mwh / 1000.0
 
+        # Compute cyclical features matching BatteryEnv
+        hour_sin = np.sin(2 * np.pi * row['hour'] / 24)
+        hour_cos = np.cos(2 * np.pi * row['hour'] / 24)
+        day_sin = np.sin(2 * np.pi * row['DayOfWeek'] / 6)
+        day_cos = np.cos(2 * np.pi * row['DayOfWeek'] / 6)
+        month_sin = np.sin(2 * np.pi * row['Month'] / 12)
+        month_cos = np.cos(2 * np.pi * row['Month'] / 12)
+
         obs_raw = np.array([
-            price_mwh, row['hour'] - 1, row['DayOfWeek'], row['Month'],
-            row['price_rolling_avg_24h'], battery_percent
-        ], dtype=np.float32)
+            price_mwh,
+            hour_sin,
+            hour_cos,
+            day_sin,
+            day_cos,
+            month_sin,
+            month_cos,
+            row['price_rolling_avg_24h'],
+            battery_percent
+        ], dtype=np.float32)[None, :]  # Shape: (1, 9) for pyfunc
         
-        normalized_obs = vec_env.normalize_obs(np.array([obs_raw]))
-        action, _ = model.predict(normalized_obs, deterministic=True)
-        action_str = {0: 'HOLD', 1: 'BUY', 2: 'SELL'}.get(action[0], 'HOLD')
+        action = model_wrapper.predict(obs_raw)[0]  # Pyfunc handles normalization and prediction
+        action_str = {0: 'HOLD', 1: 'BUY', 2: 'SELL'}.get(action, 'HOLD')
         
         # Capture state *before* action for logging
         battery_charge_before = battery_charge
@@ -122,56 +119,46 @@ def run_rl_model_simulation(csv_file, max_battery_capacity, charge_discharge_rat
         
     return total_profit, all_results
 
-# --- NEW: Main Service Function for the Correct Oracle Model ---
+# --- Main Service Function for the Correct Oracle Model ---
 def calculate_globally_optimal_profit(csv_file, max_battery_capacity, charge_discharge_rate):
     """
-    Calculates the true maximum possible profit by pairing the absolute cheapest
-    buy opportunities with the absolute most expensive sell opportunities.
+    Calculates the true maximum possible profit by pairing the cheapest
+    buy opportunities with the most expensive sell opportunities.
     """
     logger.info("Calculating globally optimal profit (True Oracle)...")
     
-    csv_file.seek(0) # Ensure we read the file from the beginning
+    csv_file.seek(0)  # Reset file pointer
     csv_data = csv_file.read().decode('utf-8')
     df = pd.read_csv(StringIO(csv_data), sep=';', decimal=',')
     
     df.rename(columns={'Price (EUR)': 'price', 'Date': 'timestamp', 'Hour': 'hour'}, inplace=True)
     df['price'] = pd.to_numeric(df['price'], errors='coerce')
     df.dropna(inplace=True)
-    if df.empty: return 0.0
+    if df.empty:
+        return 0.0
 
-    # 1. Create lists of all possible buy and sell "slots" of energy
+    # Create lists of buy/sell slots
     buy_prices = []
     sell_prices = []
-    
-    # For each hour, we can charge/discharge a certain amount. We treat each kWh as a slot.
-    # The number of slots per hour is limited by the charge_discharge_rate.
     slots_per_hour = int(charge_discharge_rate)
     
     for price in df['price']:
         buy_prices.extend([price] * slots_per_hour)
         sell_prices.extend([price] * slots_per_hour)
         
-    # 2. Sort the opportunities
+    # Sort opportunities
     buy_prices.sort()
     sell_prices.sort(reverse=True)
     
-    # 3. Pair them up to calculate profit
+    # Calculate profit by pairing
     total_profit_mwh = 0.0
-    # The number of transactions is limited by the number of slots or half the battery capacity,
-    # because one cycle is a buy and a sell.
-    # Total energy throughput is limited. A simple way to model this is to limit the pairs.
-    # A more accurate way would involve a proper linear program, but this is a very strong heuristic.
     for buy_price, sell_price in zip(buy_prices, sell_prices):
         if sell_price > buy_price:
             total_profit_mwh += (sell_price - buy_price)
         else:
-            # Once the most expensive sell is cheaper than the cheapest buy, stop.
             break
             
-    # The total profit also cannot exceed the profit from cycling the full battery every day
-    # This is a complex constraint, so we'll use the direct pairing as a strong upper bound.
-    
-    # Convert profit from EUR/MWh to EUR/kWh
+    # Convert to EUR/kWh
     total_profit_kwh = total_profit_mwh / 1000.0
     
     logger.info(f"[True Oracle] Max possible profit: {total_profit_kwh:.2f}")
