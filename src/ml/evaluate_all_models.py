@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO)
 STORAGE_CAPACITY_KWH = 215.0
 CHARGE_RATE_KW = 40.0
 
-def load_test_data(test_csv_path):
+def load_test_data(test_csv_path, lstm_wrapper):
     """Load and preprocess Test.csv for BESS simulation."""
     if not os.path.exists(test_csv_path):
         raise FileNotFoundError(f"Test CSV not found at {test_csv_path}")
@@ -42,6 +42,16 @@ def load_test_data(test_csv_path):
     df['DayOfWeek'] = df['timestamp'].dt.weekday
     df['Month'] = df['timestamp'].dt.month
     df['price_rolling_avg_24h'] = df['price'].rolling(window=24, min_periods=1).mean()
+
+    # Compute forecasted_price_mean for df
+    forecasts = []
+    seq_len = 24
+    for i in range(len(df) - seq_len):
+        seq = df['price'].values[i:i+seq_len].reshape(1, seq_len, 1)
+        forecast_mean = lstm_wrapper.predict(seq)[0][0]
+        forecasts.append(forecast_mean)
+    forecasts = [0] * seq_len + forecasts  # Pad
+    df['forecasted_price_mean'] = forecasts
     
     return df
 
@@ -72,8 +82,9 @@ def run_model_simulation(model_wrapper, df, max_battery_capacity, charge_dischar
             month_sin,
             month_cos,
             row['price_rolling_avg_24h'],
-            battery_percent
-        ], dtype=np.float32)[None, :]  # Shape: (1, 9) for pyfunc
+            battery_percent,
+            row['forecasted_price_mean']
+        ], dtype=np.float32)[None, :]  # Shape: (1, 10) for pyfunc
         
         action = model_wrapper.predict(obs_raw)[0]
         action_str = {0: 'HOLD', 1: 'BUY', 2: 'SELL'}.get(action, 'HOLD')
@@ -124,7 +135,10 @@ def main(tracking_uri, test_csv_path, model_name="BatteryPPOModel"):
     if not versions:
         raise ValueError(f"No versions found for model '{model_name}' in MLflow.")
     
-    df = load_test_data(test_csv_path)
+    lstm_uri = "models:/BESS_Price_Forecaster/Latest"
+    lstm_wrapper = mlflow.pyfunc.load_model(lstm_uri)
+ 
+    df = load_test_data(test_csv_path, lstm_wrapper)
     oracle_profit = calculate_oracle_profit(df, STORAGE_CAPACITY_KWH, CHARGE_RATE_KW)
     logger.info(f"Oracle Profit: €{oracle_profit:.2f}")
     
@@ -156,7 +170,7 @@ def main(tracking_uri, test_csv_path, model_name="BatteryPPOModel"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate MLflow BESS models on Test.csv for profit maximization.")
     parser.add_argument("--tracking_uri", default="http://127.0.0.1:5000", help="MLflow tracking URI (local or gs:// for GCP).")
-    parser.add_argument("--test_csv_path", default="/Users/chavdarbilyanski/energyscale/src/ml/data/combine/2025_1H_output_with_features2.csv", help="Path to Test.csv dataset (defaults to Test.csv in cwd).")
+    parser.add_argument("--test_csv_path", default="/Users/chavdarbilyanski/energyscale/src/ml/data/combine/2025_1H_output_with_features.csv", help="Path to Test.csv dataset (defaults to Test.csv in cwd).")
     args = parser.parse_args()
     
     main(args.tracking_uri, args.test_csv_path)

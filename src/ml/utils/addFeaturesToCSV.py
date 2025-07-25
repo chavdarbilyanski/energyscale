@@ -9,8 +9,8 @@ from datetime import datetime
 import io
 
 # --- Configuration ---
-INPUT_FILENAME = '/Users/chavdarbilyanski/energyscale/src/ml/data/input/2025_IBEX.csv'
-OUTPUT_FILENAME = '/Users/chavdarbilyanski/energyscale/src/ml/data/combine/2025_1H_output_with_features.csv'
+INPUT_FILENAME = '/Users/chavdarbilyanski/energyscale/src/ml/data/combine/combined_output.csv'
+OUTPUT_FILENAME = '/Users/chavdarbilyanski/energyscale/src/ml/data/combine/combined_output_with_features.csv'
 # ---------------------
 
 try:

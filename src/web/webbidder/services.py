@@ -61,6 +61,19 @@ def run_rl_model_simulation(csv_file, max_battery_capacity, charge_discharge_rat
     df['Month'] = df['timestamp'].dt.month
     df['price_rolling_avg_24h'] = df['price'].rolling(window=24, min_periods=1).mean()
     
+    lstm_uri = "models:/BESS_Price_Forecaster/Latest"
+    lstm_wrapper = mlflow.pyfunc.load_model(lstm_uri)
+
+    # Compute forecasted_price_mean for df
+    forecasts = []
+    seq_len = 24
+    for i in range(len(df) - seq_len):
+        seq = df['price'].values[i:i+seq_len].reshape(1, seq_len, 1)
+        forecast_mean = lstm_wrapper.predict(seq)[0][0]
+        forecasts.append(forecast_mean)
+    forecasts = [0] * seq_len + forecasts  # Pad
+    df['forecasted_price_mean'] = forecasts
+    
     # Inference Loop
     for _, row in df.iterrows():
         battery_percent = (battery_charge / max_battery_capacity) if max_battery_capacity > 0 else 0.0
@@ -84,8 +97,9 @@ def run_rl_model_simulation(csv_file, max_battery_capacity, charge_discharge_rat
             month_sin,
             month_cos,
             row['price_rolling_avg_24h'],
-            battery_percent
-        ], dtype=np.float32)[None, :]  # Shape: (1, 9) for pyfunc
+            battery_percent,
+            row['forecasted_price_mean']
+        ], dtype=np.float32)[None, :]  # Shape: (1, 10) for pyfunc
         
         action = model_wrapper.predict(obs_raw)[0]  # Pyfunc handles normalization and prediction
         action_str = {0: 'HOLD', 1: 'BUY', 2: 'SELL'}.get(action, 'HOLD')

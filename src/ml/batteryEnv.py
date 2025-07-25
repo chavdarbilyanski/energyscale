@@ -22,9 +22,9 @@ class BatteryEnv(gym.Env):
         # Action space: 0=HOLD, 1=CHARGE, 2=DISCHARGE
         self.action_space = spaces.Discrete(3)
 
-        # Observation space: [Price, Hour_Sin, Hour_Cos, DayOfWeek_Sin, DayOfWeek_Cos, Month_Sin, Month_Cos, Avg_Price, Battery_%]
-        low_bounds = np.array([0, -1, -1, -1, -1, -1, -1, 0, 0], dtype=np.float32)
-        high_bounds = np.array([np.inf, 1, 1, 1, 1, 1, 1, np.inf, 1.0], dtype=np.float32)
+        # Observation space: [Price, Hour_Sin, Hour_Cos, DayOfWeek_Sin, DayOfWeek_Cos, Month_Sin, Month_Cos, Avg_Price, Battery_%, forecasted_price_mean]
+        low_bounds = np.array([0, -1, -1, -1, -1, -1, -1, 0, 0, 0], dtype=np.float32)  # Last: forecast low
+        high_bounds = np.array([np.inf, 1, 1, 1, 1, 1, 1, np.inf, 1.0, np.inf], dtype=np.float32)  # Forecast high
         self.observation_space = spaces.Box(low=low_bounds, high=high_bounds, dtype=np.float32)
 
         self.current_step = 0
@@ -35,13 +35,16 @@ class BatteryEnv(gym.Env):
         row = self.data.iloc[self.current_step]
         battery_percent = self.current_kwh / self.storage_capacity
 
+        forecasted_price_mean = row['forecasted_price_mean']  # Precomputed in train.py
+
         state = np.array([
             row['Price (EUR)'],
             row['hour_sin'], row['hour_cos'],
             row['dayofweek_sin'], row['dayofweek_cos'],
             row['month_sin'], row['month_cos'],
             row['price_rolling_avg_24h'],
-            battery_percent
+            battery_percent,
+            forecasted_price_mean
         ], dtype=np.float32)
         return state
 

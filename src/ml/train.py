@@ -104,19 +104,19 @@ dataset['month_sin'] = np.sin(2 * np.pi * dataset['Month'] / 12)
 dataset['month_cos'] = np.cos(2 * np.pi * dataset['Month'] / 12)
 
 # Simple LSTM forecaster (log to MLflow)
-class PriceLSTM(nn.Module):
-    def __init__(self, input_size=1, hidden_size=50, num_layers=1, output_size=24):
-        super().__init__()
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, output_size)
-    
-    def forward(self, x):
-        out, _ = self.lstm(x)
-        return self.fc(out[:, -1, :])
+mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000"))
+lstm_uri = "models:/BESS_Price_Forecaster/Latest"
+lstm_wrapper = mlflow.pyfunc.load_model(lstm_uri)
 
-# Train on dataset['price'] (scale, window=24)
-scaler = MinMaxScaler()
-scaled_prices = scaler.fit_transform(dataset['price'].values.reshape(-1, 1))
+# Precompute forecasted_price_mean (sliding window)
+forecasts = []
+seq_len = 24
+for i in range(len(dataset) - seq_len):
+    seq = dataset['Price (EUR)'].values[i:i+seq_len].reshape(1, seq_len, 1)
+    forecast_mean = lstm_wrapper.predict(seq)[0][0]  # Mean of next 24h
+    forecasts.append(forecast_mean)
+forecasts = [0] * seq_len + forecasts  # Pad beginning
+dataset['forecasted_price_mean'] = forecasts
 
 # Define the parameters that your BatteryEnv needs
 STORAGE_CAPACITY_KWH = 215.0
@@ -139,7 +139,6 @@ print("Environment created successfully.")
 # --- 4. Define and Train the Model ---
 total_timesteps = len(dataset) * TOTAL_TIMESTEPS_MULTIPLIER
 
-mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000"))
 mlflow.set_experiment("Battery RL Agents")  # Add this line to use your existing experiment
 
 with mlflow.start_run(run_name="Ciclical Time") as run:  # Start an MLflow run
