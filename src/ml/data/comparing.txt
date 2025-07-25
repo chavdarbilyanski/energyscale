@@ -1,0 +1,7 @@
+--- Evaluation Summary ---
+version                           run_id  rl_profit  oracle_profit  performance_score
+      7 401d5ed6edf64059afb3f2c33f7c7277 2454.81430      6559.7096          37.422606
+      5 d9c5794a530b48ff965ea11c62f754d4 2935.35155      6559.7096          44.748194
+      4 c00d98b57c8b4205bf820974bda0f416 3291.19555      6559.7096          50.172885
+      6 fe0895ba4cef4d0eb2eff11e6d039697 2977.79740      6559.7096          45.395263
+      3 a98a1548de644c0d9c142f8ea4ac5ac1 3230.36750      6559.7096          49.245587

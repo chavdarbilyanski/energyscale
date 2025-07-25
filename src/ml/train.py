@@ -2,11 +2,18 @@ import pandas as pd
 import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
 from gymnasium import spaces
 import gymnasium as gym
+from sklearn.preprocessing import MinMaxScaler
+from torch import nn, optim
+import torch
 import batteryEnv
 import mlflow
 import os
+from typing import Callable
+# Optional: Checkpoint callback for long trainings (save every 10k steps, useful for GCP interruptions)
+checkpoint_callback = CheckpointCallback(save_freq=10000, save_path="./models/", name_prefix="ppo_bess")
 
 class PPOModelWrapper(mlflow.pyfunc.PythonModel):
     def load_context(self, context):
@@ -43,11 +50,26 @@ class PPOModelWrapper(mlflow.pyfunc.PythonModel):
         action, _ = self.model.predict(normalized_input, deterministic=True)
         return action
 
+# This is a helper function to create a linear scheduler
+def linear_schedule(initial_value: float) -> Callable[[float], float]:
+    """
+    Linear learning rate schedule.
+    :param initial_value: Initial learning rate.
+    :return: schedule that computes current learning rate depending on remaining progress
+    """
+    def func(progress_remaining: float) -> float:
+        """
+        Progress will decrease from 1 (beginning) to 0 (end).
+        """
+        return progress_remaining * initial_value
+
+    return func
+
 # --- 1. Configuration ---
 DATA_FILE_NAME = '/Users/chavdarbilyanski/powerbidder/src/ml/data/combine/combined_output_with_features.csv'
 RL_MODEL_PATH = "../models/PPO_Cyclical.zip"
 STATS_PATH = "../models/PPO_Cycli_vec_normalize_stats.pkl"
-TOTAL_TIMESTEPS_MULTIPLIER = 8
+TOTAL_TIMESTEPS_MULTIPLIER = 40
 
 # Column names
 DATE_COLUMN = 'Date'
@@ -81,6 +103,21 @@ dataset['dayofweek_cos'] = np.cos(2 * np.pi * dataset['DayOfWeek'] / 6) # It is 
 dataset['month_sin'] = np.sin(2 * np.pi * dataset['Month'] / 12)
 dataset['month_cos'] = np.cos(2 * np.pi * dataset['Month'] / 12)
 
+# Simple LSTM forecaster (log to MLflow)
+class PriceLSTM(nn.Module):
+    def __init__(self, input_size=1, hidden_size=50, num_layers=1, output_size=24):
+        super().__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_size, output_size)
+    
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        return self.fc(out[:, -1, :])
+
+# Train on dataset['price'] (scale, window=24)
+scaler = MinMaxScaler()
+scaled_prices = scaler.fit_transform(dataset['price'].values.reshape(-1, 1))
+
 # Define the parameters that your BatteryEnv needs
 STORAGE_CAPACITY_KWH = 215.0
 CHARGE_RATE_KW = 40.0
@@ -106,29 +143,32 @@ mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:
 mlflow.set_experiment("Battery RL Agents")  # Add this line to use your existing experiment
 
 with mlflow.start_run(run_name="Ciclical Time") as run:  # Start an MLflow run
-    # Log key parameters for reproducibility
-    mlflow.log_param("storage_capacity_kwh", STORAGE_CAPACITY_KWH)
-    mlflow.log_param("charge_rate_kw", CHARGE_RATE_KW)
-    mlflow.log_param("efficiency", EFFICIENCY)
-    mlflow.log_param("total_timesteps", total_timesteps)
-    mlflow.log_param("gamma", 0.999)
-    mlflow.log_param("n_steps", 2048)
-    mlflow.log_param("ent_coef", 0.01)
-    mlflow.log_param("learning_rate", 0.0003)
+    
 
     model = PPO(
         "MlpPolicy", 
         env, 
         verbose=1, 
         tensorboard_log="./ppo_battery_tensorboard/",
-        gamma=0.999,
+        gamma=0.99999,
         n_steps=2048,
         ent_coef=0.01,
-        learning_rate=0.0003
+        learning_rate=linear_schedule(0.0003)
     )
 
+    # Log key parameters for reproducibility
+    mlflow.log_param("storage_capacity_kwh", STORAGE_CAPACITY_KWH)
+    mlflow.log_param("charge_rate_kw", CHARGE_RATE_KW)
+    mlflow.log_param("efficiency", EFFICIENCY)
+    mlflow.log_param("total_timesteps", total_timesteps)
+    mlflow.log_param("gamma", model.gamma)
+    mlflow.log_param("n_steps", model.n_steps)
+    mlflow.log_param("ent_coef", model.ent_coef)
+    mlflow.log_param("learning_rate", model.learning_rate)
+
+
     print(f"--- Starting new training run for {total_timesteps:,} timesteps ---")
-    model.learn(total_timesteps=total_timesteps, progress_bar=True)
+    model.learn(total_timesteps=total_timesteps, callback=checkpoint_callback, progress_bar=True)
     print("--- Training complete ---")
     # --- 5. Save and Log the Model and Normalization Stats ---
     print("Saving and logging model artifacts to MLflow...")

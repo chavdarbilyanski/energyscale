@@ -90,7 +90,7 @@ def upload_csv(request):
                 raise ValueError("CSV chunk missing required columns.")
 
             chunk[PRICE_COLUMN] = pd.to_numeric(chunk[PRICE_COLUMN], errors='coerce')
-            chunk[DATE_COLUMN] = pd.to_datetime(chunk[DATE_COLUMN], format='%d/%m/%Y', errors='coerce')
+            chunk[DATE_COLUMN] = pd.to_datetime(chunk[DATE_COLUMN], format='%d/%m/%y', errors='coerce')
             chunk[HOUR_COLUMN] = pd.to_numeric(chunk[HOUR_COLUMN], errors='coerce')
             chunk.dropna(subset=required_cols, inplace=True)
             if chunk.empty:
@@ -134,7 +134,7 @@ def upload_csv(request):
                 
                 # Create result dictionary
                 action_details = {
-                    'timestamp': row[DATE_COLUMN].strftime('%d/%m/%Y'),
+                    'timestamp': row[DATE_COLUMN].strftime('%d/%m/%y'),
                     'hour': int(row[HOUR_COLUMN]),
                     'action': action_str,
                     'price': price_kwh,

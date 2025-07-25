@@ -51,7 +51,7 @@ def run_rl_model_simulation(csv_file, max_battery_capacity, charge_discharge_rat
     # Preprocessing logic
     df.rename(columns={'Price (EUR)': 'price', 'Date': 'timestamp', 'Hour': 'hour'}, inplace=True)
     df['price'] = pd.to_numeric(df['price'], errors='coerce')
-    df['timestamp'] = pd.to_datetime(df['timestamp'], format='%d/%m/%Y', errors='coerce')
+    df['timestamp'] = pd.to_datetime(df['timestamp'], format='%d/%m/%y', errors='coerce')
     df['hour'] = pd.to_numeric(df['hour'], errors='coerce')
     df.dropna(inplace=True)
     if df.empty:
@@ -107,7 +107,7 @@ def run_rl_model_simulation(csv_file, max_battery_capacity, charge_discharge_rat
         total_profit += profit_change
         
         all_results.append({
-            'timestamp': row['timestamp'].strftime('%d/%m/%Y'),
+            'timestamp': row['timestamp'].strftime('y'),
             'hour': int(row['hour']),
             'price': price_kwh,
             'action': action_str,
