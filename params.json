@@ -1,0 +1,1 @@
+{"hidden_size": 320, "num_layers": 2, "epochs": 300, "lr": 0.001, "dropout": 0.3}

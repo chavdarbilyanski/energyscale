@@ -69,7 +69,7 @@ def linear_schedule(initial_value: float) -> Callable[[float], float]:
 DATA_FILE_NAME = '/Users/chavdarbilyanski/powerbidder/src/ml/data/combine/combined_output_with_features.csv'
 RL_MODEL_PATH = "../models/PPO_Cyclical.zip"
 STATS_PATH = "../models/PPO_Cycli_vec_normalize_stats.pkl"
-TOTAL_TIMESTEPS_MULTIPLIER = 40
+TOTAL_TIMESTEPS_MULTIPLIER = 20
 
 # Column names
 DATE_COLUMN = 'Date'
@@ -149,8 +149,8 @@ with mlflow.start_run(run_name="Ciclical Time") as run:  # Start an MLflow run
         env, 
         verbose=1, 
         tensorboard_log="./ppo_battery_tensorboard/",
-        gamma=0.99999,
-        n_steps=2048,
+        gamma=0.9999,
+        n_steps=4096,
         ent_coef=0.01,
         learning_rate=linear_schedule(0.0003)
     )

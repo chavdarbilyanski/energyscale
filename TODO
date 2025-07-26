@@ -23,4 +23,10 @@ for t in range(T):
 prob.solve()
 return value(prob.objective)
 
+=====
+Notes for BESS + Solar Workflow
+Tuning: If MAE/RMSE (~20/29 from your metrics) remain high, try hidden_size=256, epochs=100 in MLflow sweeps. Log in train_lstm for comparison.
+Solar Extension: For multivariate LSTM (e.g., price + solar_kwh), update input_size=2 in PriceLSTM, pass solar data in PriceDataset. Ensure hidden_size is logged/retrieved similarly.
+GCP Scalability: Use Vertex AI for hyperparam tuning (e.g., hidden_size, dropout=0.3 for solar noise). Store artifacts in GCS; integrate with BigQuery for Django profit dashboards.
+If errors persist (e.g., MLflow issues or metric degradation), share the new run ID or metrics for debugging. For solar integration, provide sample solar_kwh data for code tweaks.
 

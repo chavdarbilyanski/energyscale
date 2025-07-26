@@ -5,3 +5,18 @@ version                           run_id  rl_profit  oracle_profit  performance_
       4 c00d98b57c8b4205bf820974bda0f416 3291.19555      6559.7096          50.172885
       6 fe0895ba4cef4d0eb2eff11e6d039697 2977.79740      6559.7096          45.395263
       3 a98a1548de644c0d9c142f8ea4ac5ac1 3230.36750      6559.7096          49.245587
+
+
+Metric      Value
+train_loss  0.0010761154197370584
+test_mae    22.388938981128568
+test_rmse   30.92978201438712
+test_mape   20.644359816438236
+test_r2     0.5973681987372921
+
+Test MAE: 20.2285, RMSE: 27.8013, MAPE: 18.54%, R2: 0.6747
+Test MAE: 19.8395, RMSE: 27.3326, MAPE: 18.58%, R2: 0.6856
+Test MAE: 15.6120, RMSE: 21.0088, MAPE: 14.84%, R2: 0.8142
+Test MAE: 2.5327, RMSE: 3.2520, MAPE: 2.50%, R2: 0.9955 (hidden_size=300, num_layers=2, epochs=400, batch_size=32, lr=0.001, dropout=0.3)
+Test MAE: 3.7447, RMSE: 4.8823, MAPE: 3.73%, R2: 0.9900 (hidden_size=300, num_layers=2, epochs=200, batch_size=32, lr=0.001, dropout=0.3)
+Test MAE: 2.6662, RMSE: 3.6922, MAPE: 2.61%, R2: 0.9943 (hidden_size=320, num_layers=2, epochs=300, batch_size=32, lr=0.001, dropout=0.3)
