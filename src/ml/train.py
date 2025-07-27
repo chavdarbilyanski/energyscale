@@ -66,7 +66,7 @@ def linear_schedule(initial_value: float) -> Callable[[float], float]:
 DATA_FILE_NAME = '/Users/chavdarbilyanski/powerbidder/src/ml/data/combine/combined_output_with_features.csv'
 RL_MODEL_PATH = "../models/PPO_Cyclical.zip"
 STATS_PATH = "../models/PPO_Cycli_vec_normalize_stats.pkl"
-TOTAL_TIMESTEPS_MULTIPLIER = 8
+TOTAL_TIMESTEPS_MULTIPLIER = 400
 
 # Column names
 DATE_COLUMN = 'Date'
@@ -154,6 +154,7 @@ with mlflow.start_run(run_name="Ciclical Time") as run:  # Start an MLflow run
     )
 
     # Log key parameters for reproducibility
+    mlflow.log_param("ent_coef", 0.01)  # Log for GCP tracking
     mlflow.log_param("storage_capacity_kwh", STORAGE_CAPACITY_KWH)
     mlflow.log_param("charge_rate_kw", CHARGE_RATE_KW)
     mlflow.log_param("efficiency", EFFICIENCY)

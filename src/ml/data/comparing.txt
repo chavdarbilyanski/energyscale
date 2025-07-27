@@ -22,3 +22,5 @@ Test MAE: 3.7447, RMSE: 4.8823, MAPE: 3.73%, R2: 0.9900 (hidden_size=300, num_la
 Test MAE: 2.6662, RMSE: 3.6922, MAPE: 2.61%, R2: 0.9943 (hidden_size=320, num_layers=2, epochs=300, batch_size=32, lr=0.001, dropout=0.3)
 --24 sequence
 Test MAE: 33.0922, RMSE: 57.8086, MAPE: 26361821.88%, R2: 0.6130
+Test MAE: 8.7940, RMSE: 12.1270, MAPE: 3308516.02%, R2: 0.9830
+Test MAE: 9.0447, RMSE: 12.4364, MAPE: 3556278.52%, R2: 0.9821

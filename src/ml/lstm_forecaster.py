@@ -49,22 +49,28 @@ class LSTMForecasterWrapper(mlflow.pyfunc.PythonModel):
     def load_context(self, context):
         model_path = context.artifacts["model"]
         scaler_path = context.artifacts["scaler"]
-        # Default params for validation or if not found
+        # New: Load from params artifact if available (preferred)
         hidden_size = 50
         num_layers = 1
         dropout = 0.2
-        
-        # Try to fetch params from MLflow run if possible
-        try:
-            client = MlflowClient()
-            run_id = mlflow.active_run().info.run_id if mlflow.active_run() else None
-            if run_id:
-                run = client.get_run(run_id)
-                hidden_size = int(run.data.params.get("hidden_size", hidden_size))
-                num_layers = int(run.data.params.get("num_layers", num_layers))
-                dropout = float(run.data.params.get("dropout", dropout))
-        except Exception as e:
-            print(f"Warning: Could not fetch params from MLflow (using defaults): {e}")
+        if "params" in context.artifacts:
+            params_path = context.artifacts["params"]
+            params = joblib.load(params_path)
+            hidden_size = params.get("hidden_size", hidden_size)
+            num_layers = params.get("num_layers", num_layers)
+            dropout = params.get("dropout", dropout)
+        else:
+            # Fallback to MLflow run (if active) or defaults
+            try:
+                client = MlflowClient()
+                run_id = mlflow.active_run().info.run_id if mlflow.active_run() else None
+                if run_id:
+                    run = client.get_run(run_id)
+                    hidden_size = int(run.data.params.get("hidden_size", hidden_size))
+                    num_layers = int(run.data.params.get("num_layers", num_layers))
+                    dropout = float(run.data.params.get("dropout", dropout))
+            except Exception as e:
+                print(f"Warning: Could not fetch params from MLflow (using defaults): {e}")
         
         self.model = PriceLSTM(input_size=1, hidden_size=hidden_size, num_layers=num_layers, dropout=dropout)
         self.model.load_state_dict(torch.load(model_path, weights_only=True, map_location=torch.device('cpu')))
@@ -119,7 +125,7 @@ def evaluate_train(model, scaler, scaled_prices):
     mlflow.log_artifact(plot_path)
     os.remove(plot_path)
 
-def train_lstm(data_path, hidden_size=350, num_layers=1, epochs=350, batch_size=32, lr=0.003, dropout=0.2):
+def train_lstm(data_path, hidden_size=350, num_layers=1, epochs=400, batch_size=32, lr=0.003, dropout=0.2):
     df = pd.read_csv(data_path, sep=';', decimal=',')
     prices = df['Price (EUR)'].values
     scaler = MinMaxScaler()
@@ -158,12 +164,24 @@ def train_lstm(data_path, hidden_size=350, num_layers=1, epochs=350, batch_size=
             print(f"Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.4f}")
         
         evaluate_train(model, scaler, scaled_prices)
+
+        params_dict = {
+            "hidden_size": hidden_size,
+            "num_layers": num_layers,
+            "dropout": dropout
+        }
+        params_path = "params.pkl"
+        joblib.dump(params_dict, params_path)
         
         model_path = "lstm_price_model.pth"
         torch.save(model.state_dict(), model_path)  # Save state_dict only
         scaler_path = "scaler.pkl"
         joblib.dump(scaler, scaler_path)
-        artifacts = {"model": model_path, "scaler": scaler_path}
+        artifacts = {
+            "model": model_path,
+            "scaler": scaler_path,
+            "params": params_path
+            }
         mlflow.pyfunc.log_model(name="model", python_model=LSTMForecasterWrapper(), artifacts=artifacts)
         mlflow.register_model(f"runs:/{mlflow.active_run().info.run_id}/model", "BESS_Price_Forecaster")
 
