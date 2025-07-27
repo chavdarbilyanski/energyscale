@@ -5,9 +5,6 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
 from gymnasium import spaces
 import gymnasium as gym
-from sklearn.preprocessing import MinMaxScaler
-from torch import nn, optim
-import torch
 import batteryEnv
 import mlflow
 import os
@@ -69,7 +66,7 @@ def linear_schedule(initial_value: float) -> Callable[[float], float]:
 DATA_FILE_NAME = '/Users/chavdarbilyanski/powerbidder/src/ml/data/combine/combined_output_with_features.csv'
 RL_MODEL_PATH = "../models/PPO_Cyclical.zip"
 STATS_PATH = "../models/PPO_Cycli_vec_normalize_stats.pkl"
-TOTAL_TIMESTEPS_MULTIPLIER = 20
+TOTAL_TIMESTEPS_MULTIPLIER = 8
 
 # Column names
 DATE_COLUMN = 'Date'
@@ -103,20 +100,20 @@ dataset['dayofweek_cos'] = np.cos(2 * np.pi * dataset['DayOfWeek'] / 6) # It is 
 dataset['month_sin'] = np.sin(2 * np.pi * dataset['Month'] / 12)
 dataset['month_cos'] = np.cos(2 * np.pi * dataset['Month'] / 12)
 
-# Simple LSTM forecaster (log to MLflow)
+# Load LSTM forecaster from MLflow (assume trained and registered as "BESS_Price_Forecaster/Latest")
 mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000"))
 lstm_uri = "models:/BESS_Price_Forecaster/Latest"
 lstm_wrapper = mlflow.pyfunc.load_model(lstm_uri)
 
-# Precompute forecasted_price_mean (sliding window)
+# Precompute full 24h forecasted_prices (sliding window as list)
 forecasts = []
 seq_len = 24
 for i in range(len(dataset) - seq_len):
-    seq = dataset['Price (EUR)'].values[i:i+seq_len].reshape(1, seq_len, 1)
-    forecast_mean = lstm_wrapper.predict(seq)[0][0]  # Mean of next 24h
-    forecasts.append(forecast_mean)
-forecasts = [0] * seq_len + forecasts  # Pad beginning
-dataset['forecasted_price_mean'] = forecasts
+    seq = dataset['Price (EUR)'].values[i:i+seq_len].reshape(1, seq_len)
+    forecast_seq = lstm_wrapper.predict(seq)[0]  # Full (24,) sequence
+    forecasts.append(forecast_seq.tolist())  # Add as list
+forecasts = [ [0.0] * 24 ] * seq_len + forecasts  # Pad beginning with zero lists
+dataset['forecasted_prices'] = forecasts
 
 # Define the parameters that your BatteryEnv needs
 STORAGE_CAPACITY_KWH = 215.0
@@ -139,6 +136,7 @@ print("Environment created successfully.")
 # --- 4. Define and Train the Model ---
 total_timesteps = len(dataset) * TOTAL_TIMESTEPS_MULTIPLIER
 
+mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000"))
 mlflow.set_experiment("Battery RL Agents")  # Add this line to use your existing experiment
 
 with mlflow.start_run(run_name="Ciclical Time") as run:  # Start an MLflow run
@@ -150,8 +148,8 @@ with mlflow.start_run(run_name="Ciclical Time") as run:  # Start an MLflow run
         verbose=1, 
         tensorboard_log="./ppo_battery_tensorboard/",
         gamma=0.9999,
-        n_steps=4096,
-        ent_coef=0.01,
+        n_steps=8192,
+        ent_coef=0.001,
         learning_rate=linear_schedule(0.0003)
     )
 
@@ -167,7 +165,7 @@ with mlflow.start_run(run_name="Ciclical Time") as run:  # Start an MLflow run
 
 
     print(f"--- Starting new training run for {total_timesteps:,} timesteps ---")
-    model.learn(total_timesteps=total_timesteps, callback=checkpoint_callback, progress_bar=True)
+    model.learn(total_timesteps=total_timesteps, progress_bar=True, callback=checkpoint_callback)
     print("--- Training complete ---")
     # --- 5. Save and Log the Model and Normalization Stats ---
     print("Saving and logging model artifacts to MLflow...")

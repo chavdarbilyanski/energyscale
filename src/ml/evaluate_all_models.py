@@ -43,15 +43,15 @@ def load_test_data(test_csv_path, lstm_wrapper):
     df['Month'] = df['timestamp'].dt.month
     df['price_rolling_avg_24h'] = df['price'].rolling(window=24, min_periods=1).mean()
 
-    # Compute forecasted_price_mean for df
+    # Compute full 24h forecasted_prices (sliding window as list)
     forecasts = []
     seq_len = 24
     for i in range(len(df) - seq_len):
-        seq = df['price'].values[i:i+seq_len].reshape(1, seq_len, 1)
-        forecast_mean = lstm_wrapper.predict(seq)[0][0]
-        forecasts.append(forecast_mean)
-    forecasts = [0] * seq_len + forecasts  # Pad
-    df['forecasted_price_mean'] = forecasts
+        seq = df['price'].values[i:i+seq_len].reshape(1, seq_len)
+        forecast_seq = lstm_wrapper.predict(seq)[0]  # Full (24,) array
+        forecasts.append(forecast_seq.tolist())  # Convert to list
+    forecasts = [[0.0] * 24] * seq_len + forecasts  # Pad beginning with zero lists
+    df['forecasted_prices'] = forecasts
     
     return df
 
@@ -82,9 +82,8 @@ def run_model_simulation(model_wrapper, df, max_battery_capacity, charge_dischar
             month_sin,
             month_cos,
             row['price_rolling_avg_24h'],
-            battery_percent,
-            row['forecasted_price_mean']
-        ], dtype=np.float32)[None, :]  # Shape: (1, 10) for pyfunc
+            battery_percent
+        ] + row['forecasted_prices'], dtype=np.float32)[None, :]  # Now 33 dims
         
         action = model_wrapper.predict(obs_raw)[0]
         action_str = {0: 'HOLD', 1: 'BUY', 2: 'SELL'}.get(action, 'HOLD')
