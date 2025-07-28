@@ -18,6 +18,12 @@ from io import StringIO
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+PRICE_COLUMN = 'price'  # Matches renaming in load_test_data; use 'Price (EUR)' if before rename
+STORAGE_CAPACITY_KWH = 215.0  # Already defined, but ensure consistency
+CHARGE_RATE_KW = 40.0
+EFFICIENCY = 0.96  # Add this to match batteryEnv.py for realistic losses
+DEGRADATION_COST = 0.01
+
 # Hardcoded BESS params (match train.py; override via args if needed for GCP flexibility)
 STORAGE_CAPACITY_KWH = 215.0
 CHARGE_RATE_KW = 40.0
@@ -103,7 +109,46 @@ def run_model_simulation(model_wrapper, df, max_battery_capacity, charge_dischar
     return total_profit
 
 def calculate_oracle_profit(df, max_battery_capacity, charge_discharge_rate):
-    """Compute true optimal profit (Oracle) by pairing cheapest buys with expensive sells."""
+    """Constrained optimal profit (Oracle) via DP: Respects sequence, capacity, efficiency, degradation per transaction."""
+    prices = df['price'].values
+    T = len(prices)
+    capacity = int(max_battery_capacity)
+    rate = int(charge_discharge_rate)
+    
+    # DP table: dp[t][b] = max profit up to timestep t with battery level b
+    dp = np.full((T + 1, capacity + 1), -np.inf)
+    start_charge = capacity // 2  # Match env initial state
+    dp[0][start_charge] = 0.0
+    
+    for t in range(T):
+        price_kwh = prices[t] / 1000.0
+        for b in range(capacity + 1):
+            if dp[t][b] == -np.inf:
+                continue
+            # HOLD: No change, no degradation
+            dp[t + 1][b] = max(dp[t + 1][b], dp[t][b])
+            # BUY: If space, apply efficiency on charge, degradation
+            if b < capacity:
+                amount = min(rate, capacity - b)
+                cost = amount * price_kwh
+                new_b = min(int(b + amount * EFFICIENCY), capacity)  # Efficiency loss
+                new_profit = dp[t][b] - cost - DEGRADATION_COST
+                dp[t + 1][new_b] = max(dp[t + 1][new_b], new_profit)
+            # SELL: If charged, degradation
+            if b > 0:
+                amount = min(rate, b)
+                revenue = amount * price_kwh
+                new_b = b - amount
+                new_profit = dp[t][b] + revenue - DEGRADATION_COST
+                dp[t + 1][new_b] = max(dp[t + 1][new_b], new_profit)
+    
+    max_profit = np.max(dp[T])
+    if max_profit == -np.inf:
+        raise ValueError("No feasible Oracle profit calculated.")
+    return max_profit
+
+def calculate_oracle_profit_uncostrained_by_time_capacity(df, max_battery_capacity, charge_discharge_rate):
+    """Compute true optimal profit (Oracle) by pairing cheapest buys with expensive sells, with efficiency and degradation per transaction."""
     buy_prices = []
     sell_prices = []
     slots_per_hour = int(charge_discharge_rate)
@@ -115,14 +160,58 @@ def calculate_oracle_profit(df, max_battery_capacity, charge_discharge_rate):
     buy_prices.sort()
     sell_prices.sort(reverse=True)
     
-    total_profit_mwh = 0.0
+    total_profit = 0.0
     for buy_price, sell_price in zip(buy_prices, sell_prices):
-        if sell_price > buy_price:
-            total_profit_mwh += (sell_price - buy_price)
+        # Profit per 1kWh cycle: (sell * efficiency - buy) / 1000 - 2 * degradation (for buy + sell)
+        profit_per_cycle = ((sell_price * EFFICIENCY - buy_price) / 1000.0) - 2 * DEGRADATION_COST
+        if profit_per_cycle > 0:
+            total_profit += profit_per_cycle
         else:
             break
     
-    return total_profit_mwh / 1000.0  # EUR/kWh
+    return total_profit
+
+def calculate_oracle_profit2(df, max_battery_capacity, charge_discharge_rate):
+    """Exact optimal profit (Oracle) via DP with perfect foresight, respecting constraints."""
+    prices = df['price'].values
+    T = len(prices)
+    capacity = int(max_battery_capacity)  # e.g., 215
+    rate = int(charge_discharge_rate)  # e.g., 40
+    efficiency = EFFICIENCY
+    degradation = DEGRADATION_COST  # Or 0 for looser bound
+
+    # DP table: dp[t][b] = max profit after t steps with battery level b (0 to capacity)
+    dp = np.full((T + 1, capacity + 1), -np.inf)
+    start_charge = capacity // 2
+    dp[0][start_charge] = 0.0
+
+    for t in range(T):
+        price_kwh = prices[t] / 1000.0
+        for b in range(capacity + 1):
+            if dp[t][b] == -np.inf:
+                continue
+            # HOLD: No change
+            dp[t + 1][b] = max(dp[t + 1][b], dp[t][b])
+            # BUY: If space available
+            if b < capacity:
+                amount = min(rate, capacity - b)
+                cost = amount * price_kwh
+                new_b = min(int(b + amount * efficiency), capacity)  # Apply efficiency, cap at max
+                new_profit = dp[t][b] - cost - degradation
+                dp[t + 1][new_b] = max(dp[t + 1][new_b], new_profit)
+            # SELL: If charge available
+            if b > 0:
+                amount = min(rate, b)
+                revenue = amount * price_kwh
+                new_b = b - amount
+                new_profit = dp[t][b] + revenue - degradation
+                dp[t + 1][new_b] = max(dp[t + 1][new_b], new_profit)
+
+    # Return the max profit across all final battery states
+    max_profit = np.max(dp[T])
+    if max_profit == -np.inf:
+        raise ValueError("No feasible Oracle profit calculated.")
+    return max_profit
 
 def main(tracking_uri, test_csv_path, model_name="BatteryPPOModel"):
     """Main evaluation loop: Fetch models, simulate, compare to Oracle."""

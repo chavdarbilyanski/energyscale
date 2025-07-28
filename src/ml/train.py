@@ -28,7 +28,7 @@ class PPOModelWrapper(mlflow.pyfunc.PythonModel):
         })
         dummy_capacity = 1.0
         dummy_rate = 1.0
-        dummy_efficiency = 0.9
+        dummy_efficiency = 0.96
         
         vec_env = DummyVecEnv([lambda: batteryEnv.BatteryEnv(
             historical_data=dummy_data,
@@ -66,7 +66,7 @@ def linear_schedule(initial_value: float) -> Callable[[float], float]:
 DATA_FILE_NAME = '/Users/chavdarbilyanski/powerbidder/src/ml/data/combine/combined_output_with_features.csv'
 RL_MODEL_PATH = "../models/PPO_Cyclical.zip"
 STATS_PATH = "../models/PPO_Cycli_vec_normalize_stats.pkl"
-TOTAL_TIMESTEPS_MULTIPLIER = 400
+TOTAL_TIMESTEPS_MULTIPLIER = 200
 
 # Column names
 DATE_COLUMN = 'Date'
@@ -118,7 +118,7 @@ dataset['forecasted_prices'] = forecasts
 # Define the parameters that your BatteryEnv needs
 STORAGE_CAPACITY_KWH = 215.0
 CHARGE_RATE_KW = 40.0
-EFFICIENCY = 0.90
+EFFICIENCY = 0.96
 # --- 3. Create and Wrap the Environment ---
 print("Creating and wrapping the environment...")
 env_creator = lambda: batteryEnv.BatteryEnv(
@@ -129,7 +129,7 @@ env_creator = lambda: batteryEnv.BatteryEnv(
 )
 
 env = DummyVecEnv([env_creator])
-env = VecNormalize(env, norm_obs=True, norm_reward=True, gamma=0.999)
+env = VecNormalize(env, norm_obs=True, norm_reward=True, gamma=0.9999)
 
 print("Environment created successfully.")
 
@@ -138,10 +138,9 @@ total_timesteps = len(dataset) * TOTAL_TIMESTEPS_MULTIPLIER
 
 mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000"))
 mlflow.set_experiment("Battery RL Agents")  # Add this line to use your existing experiment
+mlflow.autolog()
 
 with mlflow.start_run(run_name="Ciclical Time") as run:  # Start an MLflow run
-    
-
     model = PPO(
         "MlpPolicy", 
         env, 
@@ -151,20 +150,8 @@ with mlflow.start_run(run_name="Ciclical Time") as run:  # Start an MLflow run
         n_steps=8192,
         ent_coef=0.001,
         learning_rate=linear_schedule(0.0003)
-    )
-
-    # Log key parameters for reproducibility
-    mlflow.log_param("ent_coef", 0.01)  # Log for GCP tracking
-    mlflow.log_param("storage_capacity_kwh", STORAGE_CAPACITY_KWH)
-    mlflow.log_param("charge_rate_kw", CHARGE_RATE_KW)
-    mlflow.log_param("efficiency", EFFICIENCY)
-    mlflow.log_param("total_timesteps", total_timesteps)
-    mlflow.log_param("gamma", model.gamma)
-    mlflow.log_param("n_steps", model.n_steps)
-    mlflow.log_param("ent_coef", model.ent_coef)
-    mlflow.log_param("learning_rate", model.learning_rate)
-
-
+    )   
+    
     print(f"--- Starting new training run for {total_timesteps:,} timesteps ---")
     model.learn(total_timesteps=total_timesteps, progress_bar=True, callback=checkpoint_callback)
     print("--- Training complete ---")
