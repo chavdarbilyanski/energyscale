@@ -116,11 +116,6 @@ STATICFILES_DIRS = [
 # --- Default primary key field type ---
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# --- Static files ---
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-    BASE_DIR / 'static',
-]
 
 # The directory where collectstatic will gather all static files for deployment.
 STATIC_ROOT = BASE_DIR.parent.parent / 'staticfiles'

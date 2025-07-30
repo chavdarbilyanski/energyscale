@@ -22,13 +22,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 # Set the working directory for the build
 WORKDIR /app
 
-# [OPTIMIZATION] Copy only the requirements files first to leverage Docker's layer cache.
-COPY requirements/requirements.txt .
-COPY requirements/requirements-ml.txt .
-
 # Install the dependencies into the virtual environment
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt && pip install --no-cache-dir -r requirements-ml.txt
+COPY requirements/requirements.txt .
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
+COPY requirements/requirements-ml.txt .
+RUN pip install --no-cache-dir -r requirements-ml.txt
+
+COPY requirements/requirements-web.txt .
+RUN pip install --no-cache-dir -r requirements-web.txt
 
 # --- Stage 2: The Final Production Image ---
 # This stage starts from a clean base image and copies only what's necessary,
