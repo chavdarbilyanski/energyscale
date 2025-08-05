@@ -25,5 +25,28 @@ services:
       dockerfile: docker/Dockerfile.ml
     env_file:
       - .env
+  emqx:  # New service for local MQTT broker
+    image: emqx/emqx:5.7.1
+    ports:
+      - "1883:1883"  # MQTT
+      - "8883:8883"  # MQTT over TLS
+      - "18083:18083"  # Dashboard
+      - "8083:8083"  # Add WebSocket
+      - "8084:8084"  # Add WebSocket/SSL
+    # env_file:
+    #   - .env
+    volumes:
+      - emqx-data:/opt/emqx/data # Persist configs/users
+      - /Users/chavdarbilyanski/energyscale/emqx_cert.pem:/opt/emqx/etc/certs/cert.pem:ro # Mount TLS certs (generate locally)
+      - /Users/chavdarbilyanski/energyscale/emqx_key.pem:/opt/emqx/etc/certs/key.pem:ro
+      - /Users/chavdarbilyanski/energyscale/emqx_cacert.pem:/opt/emqx/etc/certs/cacert.pem:ro # CA if self-signed
+    environment:
+      EMQX_DASHBOARD__DEFAULT_USERNAME: admin
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: securebess2025  # Change this
+      EMQX_LISTENER__SSL__1883__ENABLE: true  # Enable TLS on 8883
+      EMQX_LISTENER__SSL__1883__CERTFILE: /opt/emqx/etc/certs/cert.pem
+      EMQX_LISTENER__SSL__1883__KEYFILE: /opt/emqx/etc/certs/key.pem
+      EMQX_LISTENER__SSL__1883__CACERTFILE: /opt/emqx/etc/certs/cacert.pem
 volumes:
   pgdata:
+  emqx-data:
