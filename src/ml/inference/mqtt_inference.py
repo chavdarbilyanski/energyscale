@@ -138,7 +138,7 @@ def on_message(client, userdata, msg):
             raise ValueError("Invalid topic format; cannot extract device name.")
 
         data = json.loads(msg.payload.decode())
-        last_update = data['lastUpdate']
+        last_update = data['timestamp']
         soc = data['channels']['_sum']['EssSoc']
         battery_percent = soc / 100.0
 
@@ -172,6 +172,7 @@ def on_message(client, userdata, msg):
             power = 0
 
         command = {
+            "version":"1.0",
             "timestamp": datetime.utcnow().isoformat() + 'Z',
             "channels": {
                 "ess0": {
@@ -182,7 +183,7 @@ def on_message(client, userdata, msg):
 
         # Construct dynamic publish topic (e.g., cmd/edge0/channel/command)
         publish_topic = f"{COMMAND_TOPIC_PREFIX}/{device_name}{COMMAND_TOPIC_SUFFIX}"
-        client.publish(publish_topic, json.dumps(command), qos=1)
+        client.publish(publish_topic, json.dumps(command))
         print(f"Published command: {command} to {publish_topic}")
     except Exception as e:
         print(f"Message processing error: {e}")
